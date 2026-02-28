@@ -1,0 +1,25 @@
+# Core framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+websockets==14.1
+python-dotenv==1.0.1
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# Google ADK & AI
+google-adk==1.2.0
+google-genai==1.14.0
+google-cloud-aiplatform==1.78.0
+
+# GCP Services
+google-cloud-firestore==2.20.1
+google-cloud-storage==2.19.0
+
+# PDF Report Generation
+reportlab==4.2.5
+Pillow==11.1.0
+
+# Utilities
+httpx==0.28.1
+python-multipart==0.0.20
+aiofiles==24.1.0
