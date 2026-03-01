@@ -4,7 +4,6 @@ FastAPI backend with WebSocket support for ADK bidi-streaming.
 """
 
 import logging
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -26,7 +25,6 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
     logger.info(f"GCP Project: {settings.google_cloud_project}")
-    logger.info(f"GCP Location: {settings.google_cloud_location}")
     logger.info(f"Live Model: {settings.live_model}")
     logger.info(f"Vertex AI: {settings.google_genai_use_vertexai}")
     yield
@@ -67,9 +65,11 @@ async def root():
         "message": "LiveLens API — Real-Time Field Infrastructure Inspector",
         "docs": "/docs",
         "health": "/health",
+        "ws": "/ws/{user_id}/{session_id}",
     }
 
 
-# WebSocket endpoint will be added in Task 0.2 (ADK streaming)
-# from app.routers import inspection
-# app.include_router(inspection.router)
+# ── Register WebSocket router ─────────────────────────────────────────────
+from app.routers.inspection import router as inspection_router
+
+app.include_router(inspection_router)
