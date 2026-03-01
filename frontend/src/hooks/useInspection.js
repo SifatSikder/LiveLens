@@ -17,6 +17,7 @@ export function useInspection() {
   const [events, setEvents] = useState([]);
   const [findings, setFindings] = useState([]);
   const [transcript, setTranscript] = useState([]);
+  const [sessionError, setSessionError] = useState(null); // { code, message }
 
   const wsRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -44,6 +45,12 @@ export function useInspection() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        // Special control message: backend signals a Gemini API error
+        if (data?.type === 'session_error') {
+          console.error('[WS] Session error from backend:', data);
+          setSessionError({ code: data.code, message: data.message });
+          return;
+        }
         handleEvent(data);
       } catch (e) {
         console.warn('[WS] Failed to parse event:', e);
@@ -54,6 +61,12 @@ export function useInspection() {
       console.log(`[WS] Closed: code=${e.code}`);
       setConnected(false);
       setInspecting(false);
+      // Unexpected close (not triggered by user disconnect) — surface an error
+      if (e.code !== 1000 && e.code !== 1001) {
+        setSessionError(prev =>
+          prev ?? { code: e.code, message: 'Connection lost unexpectedly. Start a new inspection to reconnect.' }
+        );
+      }
     };
 
     ws.onerror = (e) => {
@@ -74,6 +87,14 @@ export function useInspection() {
     setConnected(false);
     setInspecting(false);
   }, []);
+
+  // ── Reconnect (clear error, fresh session ID, reconnect) ──────────
+  const reconnect = useCallback(() => {
+    setSessionError(null);
+    // Generate a new session ID so backend creates a fresh ADK session
+    sessionIdRef.current = 'session-' + Math.random().toString(36).substring(2, 9);
+    disconnect();
+  }, [disconnect]);
 
   // ── Send text message ─────────────────────────────────────────────
   const sendText = useCallback((text) => {
@@ -243,12 +264,17 @@ export function useInspection() {
     // Add to raw events log
     setEvents(prev => [...prev.slice(-100), event]);
 
-    const actions = event?.actions;
     const content = event?.content;
     const parts = content?.parts || [];
 
+    // Debug: log non-audio events so we can see the full structure
+    const hasAudio = parts.some(p => p.inline_data || p.inlineData);
+    if (!hasAudio) {
+      console.log('[Event]', JSON.stringify(event).substring(0, 400));
+    }
+
     for (const part of parts) {
-      // Text response from agent
+      // Text response from agent (text-mode models)
       if (part.text) {
         setTranscript(prev => [...prev, {
           role: content.role || 'model',
@@ -264,37 +290,48 @@ export function useInspection() {
         console.log('[Audio] Received chunk, key style:', part.inline_data ? 'snake_case' : 'camelCase', 'data length:', data?.length);
         if (data) playAudioChunk(data, mime);
       }
-    }
 
-    // Check for transcription events (snake_case and camelCase)
-    const serverContent = event?.server_content || event?.serverContent;
-    if (serverContent?.input_transcription?.text || serverContent?.inputTranscription?.text) {
-      setTranscript(prev => [...prev, {
-        role: 'user',
-        text: serverContent?.input_transcription?.text || serverContent?.inputTranscription?.text,
-        timestamp: Date.now(),
-        isTranscription: true,
-      }]);
-    }
-    if (serverContent?.output_transcription?.text || serverContent?.outputTranscription?.text) {
-      setTranscript(prev => [...prev, {
-        role: 'model',
-        text: serverContent?.output_transcription?.text || serverContent?.outputTranscription?.text,
-        timestamp: Date.now(),
-        isTranscription: true,
-      }]);
-    }
-
-    // Check for function calls (tool use) — look for finding logs
-    if (actions?.function_calls) {
-      for (const fc of actions.function_calls) {
+      // ✅ FIX 1: Function call from agent — correct ADK path is content.parts[].function_call
+      if (part.function_call) {
+        const fc = part.function_call;
+        console.log('[Tool] Function call:', fc.name, fc.args);
         if (fc.name === 'log_finding') {
+          const args = fc.args || {};
           setFindings(prev => [...prev, {
-            ...fc.args,
-            id: `F-${String(prev.length + 1).padStart(3, '0')}`,
+            ...args,
+            id: args.finding_id || `F-${String(prev.length + 1).padStart(3, '0')}`,
             timestamp: Date.now(),
           }]);
         }
+      }
+    }
+
+    // ✅ FIX 2: Transcription — only read from partial:false events.
+    // The API emits two kinds of transcription events:
+    //   partial:true  → streaming chunks (incomplete, used for audio sync)
+    //   partial:false → the final complete text for the full utterance
+    // Processing both caused every message to appear twice. We only want the final.
+    if (event?.partial === false) {
+      const inputTrans = event?.input_transcription;
+      if (inputTrans?.text?.trim()) {
+        console.log('[Transcription] User:', inputTrans.text);
+        setTranscript(prev => [...prev, {
+          role: 'user',
+          text: inputTrans.text.trim(),
+          timestamp: Date.now(),
+          isTranscription: true,
+        }]);
+      }
+
+      const outputTrans = event?.output_transcription;
+      if (outputTrans?.text?.trim()) {
+        console.log('[Transcription] Agent:', outputTrans.text);
+        setTranscript(prev => [...prev, {
+          role: 'model',
+          text: outputTrans.text.trim(),
+          timestamp: Date.now(),
+          isTranscription: true,
+        }]);
       }
     }
   }, [playAudioChunk]);
@@ -340,10 +377,12 @@ export function useInspection() {
     events,
     findings,
     transcript,
+    sessionError,
 
     // Actions
     connect,
     disconnect,
+    reconnect,
     sendText,
     startInspection,
     stopInspection,

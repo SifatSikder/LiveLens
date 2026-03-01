@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Camera, Activity, FileText, Wifi, WifiOff, Mic, MicOff, Send, Video, VideoOff } from 'lucide-react'
+import { Camera, Activity, FileText, Wifi, WifiOff, Mic, MicOff, Send, Video, VideoOff, AlertTriangle } from 'lucide-react'
 import { useInspection } from './hooks/useInspection'
 
 /**
@@ -12,8 +12,10 @@ export default function App() {
     events,
     findings,
     transcript,
+    sessionError,
     connect,
     disconnect,
+    reconnect,
     sendText,
     startInspection,
     stopInspection,
@@ -86,6 +88,25 @@ export default function App() {
           )}
         </div>
       </header>
+
+      {/* Error Banner */}
+      {sessionError && (
+        <div className="bg-red-900/80 border-b border-red-700 px-4 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-red-200 text-sm">
+            <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+            <span>
+              <span className="font-semibold text-red-100">Session ended: </span>
+              {sessionError.message}
+            </span>
+          </div>
+          <button
+            onClick={() => { reconnect(); }}
+            className="ml-4 px-3 py-1 rounded bg-red-700 hover:bg-red-600 text-white text-xs font-medium transition-colors flex-shrink-0"
+          >
+            Start New Session
+          </button>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 flex overflow-hidden">

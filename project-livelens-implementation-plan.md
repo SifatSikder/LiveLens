@@ -208,27 +208,27 @@ A real-time, voice-interactive AI field inspection agent. The engineer points th
 **Goal:** Project scaffolding, ADK setup, basic streaming proof-of-concept
 
 #### Task 0.1: Project Setup (4 hrs)
-- [ ] Initialize monorepo structure (frontend/ backend/ terraform/ docs/)
-- [ ] Set up GCP project, enable APIs (Vertex AI, Firestore, Cloud Storage, Cloud Run, Artifact Registry)
-- [ ] Configure service accounts and API keys
-- [ ] Set up Python venv with ADK, FastAPI, google-genai
-- [ ] Initialize React frontend with Vite
+- [x] Initialize monorepo structure (frontend/ backend/ terraform/ docs/)
+- [x] Set up GCP project, enable APIs (Vertex AI, Firestore, Cloud Storage, Cloud Run, Artifact Registry)
+- [x] Configure service accounts and API keys
+- [x] Set up Python venv with ADK, FastAPI, google-genai
+- [x] Initialize React frontend with Vite
 
 #### Task 0.2: ADK Streaming Hello World (8 hrs)
-- [ ] Follow ADK bidi-streaming quickstart
-- [ ] Establish WebSocket connection: Frontend → Backend → Gemini Live API
-- [ ] Stream microphone audio → get voice response (audio-only first)
-- [ ] Verify VAD (voice activity detection) works — interruptions handled
-- [ ] Verify context window compression config works
-- [ ] Verify session resumption config works
+- [x] Follow ADK bidi-streaming quickstart
+- [x] Establish WebSocket connection: Frontend → Backend → Gemini Live API
+- [x] Stream microphone audio → get voice response (audio-only first)
+- [x] Verify VAD (voice activity detection) works — interruptions handled
+- [x] Verify context window compression config works (SlidingWindow added to RunConfig)
+- [x] Verify session resumption config works
 
 #### Task 0.3: Add Video Streaming (8 hrs)
-- [ ] Add camera capture to frontend (MediaStream API)
-- [ ] Stream video frames via WebSocket to backend
-- [ ] Forward video to Gemini Live API alongside audio
-- [ ] Verify model can "see" and describe what camera shows
-- [ ] Test with basic objects (phone, desk, wall) — confirm 1 FPS is sufficient
-- [ ] **MILESTONE:** Can have voice+video conversation with Gemini about what camera sees
+- [x] Add camera capture to frontend (MediaStream API)
+- [x] Stream video frames via WebSocket to backend
+- [x] Forward video to Gemini Live API alongside audio
+- [x] Verify model can "see" and describe what camera shows
+- [x] Test with basic objects (phone, desk, wall) — confirm 1 FPS is sufficient
+- [x] **MILESTONE:** Can have voice+video conversation with Gemini about what camera sees ✅ Validated — 92 audio PCM chunks received in end-to-end test
 
 ---
 
@@ -236,14 +236,14 @@ A real-time, voice-interactive AI field inspection agent. The engineer points th
 **Goal:** Build the domain-specific inspector agent with function calling
 
 #### Task 1.1: Agent Definition & System Prompt (4 hrs)
-- [ ] Write comprehensive system instruction for the Inspector Agent persona
-- [ ] Include inspection methodology: systematic scanning, severity classification
-- [ ] Include standards reference: crack grading, corrosion classification, water damage severity
-- [ ] Test and iterate on prompt — voice responses should sound authoritative, structured
-- [ ] Define agent behavior for edge cases (poor lighting, blurry video, non-infrastructure)
+- [x] Write comprehensive system instruction for the Inspector Agent persona
+- [x] Include inspection methodology: systematic scanning, severity classification
+- [x] Include standards reference: crack grading, corrosion classification, water damage severity
+- [x] Test and iterate on prompt — voice responses should sound authoritative, structured
+- [x] Define agent behavior for edge cases (poor lighting, blurry video, non-infrastructure)
 
 #### Task 1.2: Function Calling — Finding Logger (8 hrs)
-- [ ] Define `log_finding` tool schema:
+- [x] Define `log_finding` tool schema:
   ```
   {
     finding_type: "crack" | "corrosion" | "water_damage" | "spalling" | "exposed_rebar" | "settlement" | "other",
@@ -254,18 +254,18 @@ A real-time, voice-interactive AI field inspection agent. The engineer points th
     standard_reference: string (optional)
   }
   ```
-- [ ] Implement tool execution in ADK — store findings in Firestore
-- [ ] Test: point camera at cracked wall → agent identifies → calls log_finding → data saved
-- [ ] Verify agent naturally continues conversation after tool call
+- [x] Implement tool execution in ADK — store findings in Firestore (services/firestore.py)
+- [x] Test: point camera at cracked wall → agent identifies → calls log_finding → data saved ✅ Validated — F-de1603cb saved to Firestore in browser e2e test (severity=4, type=crack)
+- [x] Verify agent naturally continues conversation after tool call ✅ Validated — audio chunks continued streaming after log_finding returned
 
 #### Task 1.3: Function Calling — Frame Capture (6 hrs)
-- [ ] Define `capture_frame` tool — triggered when agent identifies something worth documenting
-- [ ] Implement: grab current video frame, save to Cloud Storage with metadata
-- [ ] Link captured frame to the corresponding Firestore finding document
-- [ ] Test: agent calls capture + log_finding together for a single defect
+- [x] Define `capture_frame` tool — triggered when agent identifies something worth documenting
+- [x] Implement: grab current video frame, save to Cloud Storage with metadata (services/storage.py)
+- [x] Link captured frame to the corresponding Firestore finding document
+- [x] Test: agent calls capture + log_finding together for a single defect ✅ Validated — F-de1603cb_...jpg uploaded with linked=F-de1603cb in same browser session
 
 #### Task 1.4: Google Search Grounding (4 hrs)
-- [ ] Enable Google Search tool on the agent for standards lookup
+- [x] Enable Google Search tool on the agent for standards lookup
 - [ ] Test: "What does BS EN 1504 say about this type of crack?" → grounded response
 - [ ] Verify grounding reduces hallucination on technical standards
 

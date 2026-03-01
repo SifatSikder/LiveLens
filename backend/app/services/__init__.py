@@ -1,6 +1,6 @@
-"""Firestore service for storing inspection findings and session data.
+"""GCP service layer for LiveLens backend.
 
-Full implementation in Phase 1 (Task 1.2).
+Modules:
+    firestore  — Async Firestore CRUD for inspection findings (Task 1.2)
+    storage    — Async Cloud Storage upload for captured frames (Task 1.3)
 """
-
-# TODO Phase 1: Implement Firestore CRUD for inspections and findings

@@ -20,8 +20,10 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.genai import types
+from google.genai import errors as genai_errors
 
 from app.livelens_agent.agent import root_agent
+from app.livelens_agent.tools import clear_frame_buffer, update_frame_buffer
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -194,6 +196,8 @@ async def websocket_endpoint(
                         mime_type = msg.get("mime_type", "image/jpeg")
                         if img_data:
                             decoded = base64.b64decode(img_data)
+                            # Keep most recent frame available for capture_frame tool
+                            update_frame_buffer(session_id, decoded)
                             blob = types.Blob(
                                 mime_type=mime_type,
                                 data=decoded,
@@ -237,6 +241,18 @@ async def websocket_endpoint(
                     logger.error(f"Error sending event: {send_err}")
                     break
 
+        except genai_errors.APIError as e:
+            logger.error(f"Downstream error: {e}\n{traceback.format_exc()}")
+            # Notify the frontend so it can show an error banner
+            try:
+                if websocket.client_state.name == "CONNECTED":
+                    await websocket.send_text(json.dumps({
+                        "type": "session_error",
+                        "code": e.status_code,
+                        "message": str(e),
+                    }))
+            except Exception:
+                pass
         except Exception as e:
             logger.error(f"Downstream error: {e}\n{traceback.format_exc()}")
 
@@ -252,6 +268,7 @@ async def websocket_endpoint(
     finally:
         # ── Phase 4: Cleanup ───────────────────────────────────────────
         live_request_queue.close()
+        clear_frame_buffer(session_id)
         logger.info(f"Session ended: {user_id}/{session_id}")
 
         try:
