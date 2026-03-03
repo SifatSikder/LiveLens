@@ -34,8 +34,14 @@ export default function InspectionView() {
 
   const [textInput, setTextInput] = useState('');
   const [activeTab, setActiveTab] = useState('conversation');
+  const [connecting, setConnecting] = useState(false);
   const videoRef = useRef(null);
   const transcriptEndRef = useRef(null);
+
+  // Clear connecting state once WebSocket connects
+  useEffect(() => {
+    if (connected) setConnecting(false);
+  }, [connected]);
 
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -47,32 +53,42 @@ export default function InspectionView() {
     e.preventDefault();
     if (textInput.trim()) { sendText(textInput.trim()); setTextInput(''); }
   };
+  const handleConnect = () => { setConnecting(true); connect(); };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="min-h-[100dvh] lg:h-screen flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="bg-gray-900 border-b border-gray-800 px-4 py-2.5 flex items-center justify-between">
+      <header className="bg-gray-900 border-b border-gray-800 px-4 py-2.5 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
             <Camera className="w-5 h-5 text-white" />
           </div>
           <h1 className="text-lg font-semibold text-white">LiveLens</h1>
-          <span className="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded">v0.3</span>
+          <span className="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded hidden sm:inline">v0.3</span>
         </div>
-        <nav className="flex items-center gap-4 text-sm">
+        <nav className="flex items-center gap-3 sm:gap-4 text-sm">
           <span className="text-blue-400 font-medium flex items-center gap-1.5">
-            <Mic className="w-4 h-4" /> Inspection
+            <Mic className="w-4 h-4" />
+            <span className="hidden sm:inline">Inspection</span>
           </span>
-          <Link to="/dashboard" className="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
-            <LayoutDashboard className="w-4 h-4" /> Dashboard
+          <Link to="/dashboard" className="text-gray-400 hover:text-white transition-colors duration-200 flex items-center gap-1.5">
+            <LayoutDashboard className="w-4 h-4" />
+            <span className="hidden sm:inline">Dashboard</span>
           </Link>
           {connected ? (
             <span className="flex items-center gap-1.5 text-green-400">
-              <Wifi className="w-4 h-4" /> Live
+              <Wifi className="w-4 h-4" /> <span className="hidden sm:inline">Live</span>
             </span>
           ) : (
-            <button onClick={connect} className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors">
-              <WifiOff className="w-4 h-4" /> Connect
+            <button
+              onClick={handleConnect}
+              disabled={connecting}
+              className="flex items-center gap-1.5 text-gray-400 hover:text-white transition-colors duration-200 disabled:opacity-60"
+            >
+              {connecting
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <WifiOff className="w-4 h-4" />}
+              <span className="hidden sm:inline">{connecting ? 'Connecting…' : 'Connect'}</span>
             </button>
           )}
         </nav>
@@ -80,23 +96,23 @@ export default function InspectionView() {
 
       {/* Error Banner */}
       {sessionError && (
-        <div className="bg-red-900/80 border-b border-red-700 px-4 py-2.5 flex items-center justify-between">
+        <div className="bg-red-900/80 border-b border-red-700 px-4 py-2.5 flex items-center justify-between animate-fadeIn transition-all duration-200 flex-shrink-0">
           <div className="flex items-center gap-2 text-red-200 text-sm">
             <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
             <span><span className="font-semibold text-red-100">Session ended: </span>{sessionError.message}</span>
           </div>
-          <button onClick={reconnect} className="ml-4 px-3 py-1 rounded bg-red-700 hover:bg-red-600 text-white text-xs font-medium transition-colors flex-shrink-0">
+          <button onClick={reconnect} className="ml-4 px-3 py-1.5 min-h-[36px] rounded bg-red-700 hover:bg-red-600 text-white text-xs font-medium transition-colors duration-200 flex-shrink-0">
             New Session
           </button>
         </div>
       )}
 
       {/* Main */}
-      <main className="flex-1 flex overflow-hidden">
+      <main className="flex-1 flex flex-col lg:flex-row overflow-auto lg:overflow-hidden">
         {/* Left: Camera + controls */}
-        <div className="flex-1 flex flex-col p-4 gap-3 min-w-0">
-          <div className="flex-1">
-            <CameraStream videoRef={videoRef} inspecting={inspecting} />
+        <div className="flex flex-col p-3 gap-3 lg:flex-1 lg:min-w-0">
+          <div className="aspect-video w-full lg:flex-1 lg:aspect-auto lg:min-h-0">
+            <CameraStream videoRef={videoRef} inspecting={inspecting} connected={connected} />
           </div>
 
           {/* Audio indicator row */}
@@ -115,7 +131,7 @@ export default function InspectionView() {
           {/* Report ready banner */}
           {reportUrl && (
             <a href={reportUrl} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600/20 border border-blue-500/40 text-blue-300 text-sm hover:bg-blue-600/30 transition-colors">
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600/20 border border-blue-500/40 text-blue-300 text-sm hover:bg-blue-600/30 transition-colors duration-200 animate-fadeIn">
               <Download className="w-4 h-4 flex-shrink-0" />
               <span className="font-medium">Inspection Report Ready</span>
               <span className="text-xs opacity-70 ml-auto">Click to download PDF</span>
@@ -123,10 +139,10 @@ export default function InspectionView() {
           )}
 
           {/* Controls */}
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-wrap gap-2 items-center">
             <button
               onClick={inspecting ? handleStopInspection : handleStartInspection}
-              className={`px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors text-sm ${
+              className={`min-h-[44px] px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors duration-200 text-sm ${
                 inspecting ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'
               }`}
             >
@@ -137,20 +153,20 @@ export default function InspectionView() {
             <button
               onClick={triggerReport}
               disabled={!connected || generating || !inspecting}
-              className="px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors text-sm bg-gray-700 hover:bg-gray-600 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+              className="min-h-[44px] px-4 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-colors duration-200 text-sm bg-gray-700 hover:bg-gray-600 text-white disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
               {generating ? 'Generating…' : 'Generate Report'}
             </button>
 
-            <form onSubmit={handleSendText} className="flex-1 flex gap-2">
+            <form onSubmit={handleSendText} className="flex-1 flex gap-2 min-w-[200px]">
               <input type="text" value={textInput} onChange={(e) => setTextInput(e.target.value)}
                 placeholder={connected ? 'Type a message…' : 'Connect first…'}
                 disabled={!connected}
-                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                className="flex-1 min-h-[44px] bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors duration-200 disabled:opacity-50"
               />
               <button type="submit" disabled={!connected || !textInput.trim()}
-                className="p-2.5 bg-gray-800 border border-gray-700 rounded-lg text-gray-400 hover:text-white hover:border-gray-600 transition-colors disabled:opacity-30">
+                className="min-h-[44px] p-2.5 bg-gray-800 border border-gray-700 rounded-lg text-gray-400 hover:text-white hover:border-gray-600 transition-colors duration-200 disabled:opacity-30">
                 <Send className="w-4 h-4" />
               </button>
             </form>
@@ -158,7 +174,7 @@ export default function InspectionView() {
         </div>
 
         {/* Right sidebar */}
-        <aside className="w-96 bg-gray-900 border-l border-gray-800 flex flex-col">
+        <aside className="w-full lg:w-96 bg-gray-900 border-t lg:border-t-0 lg:border-l border-gray-800 flex flex-col max-h-[45vh] lg:max-h-none">
           {/* Tab bar */}
           <div className="flex border-b border-gray-800">
             {['conversation', 'findings'].map((tab) => (
