@@ -3,7 +3,7 @@
 
 **Competition:** Gemini Live Agent Challenge
 **Category:** Live Agents 🗣️
-**Builder:** dready (D-Ready Systems)
+**Builder:** Sifat Sikder, AI Engineer
 **Deadline:** March 16, 2026 (16 days)
 **Estimated Win Potential:** 8.5/10
 
@@ -282,10 +282,17 @@ A real-time, voice-interactive AI field inspection agent. The engineer points th
 **Goal:** Generate professional inspection reports from logged findings
 
 #### Task 2.1: Report Generator Agent (10 hrs)
-- [ ] Create separate Report Generator Agent (non-live, standard Gemini 2.5 Flash)
-- [ ] Input: all findings from Firestore + captured images from Cloud Storage
-- [ ] Output: structured JSON with sections: Executive Summary, Findings (with severity), Recommendations, Appendix
-- [ ] Test: feed sample findings → get well-structured report content
+- [x] Create separate Report Generator Agent (non-live, standard Gemini 2.5 Flash) — `backend/app/livelens_agent/report_agent.py`
+- [x] Input: all findings from Firestore + captured images from Cloud Storage — `get_session_findings()` fetches full finding docs including `image_url`
+- [x] Output: structured JSON with sections: Executive Summary, Findings (with severity), Recommendations, Appendix — enforced via `REPORT_GENERATOR_INSTRUCTION` + `response_mime_type="application/json"`
+- [x] REST endpoints added to `backend/app/routers/inspection.py`:
+  - `POST /inspection/{session_id}/report` — trigger generation, persist to Firestore, return JSON
+  - `GET  /inspection/{session_id}/report` — fetch most recent report (404 if none)
+  - `GET  /inspection/{session_id}/findings` — fetch all raw findings (useful for testing)
+- [x] Firestore helpers added to `backend/app/services/firestore.py`:
+  - `save_report(session_id, report_data)` → `inspections/{session_id}/reports/{R-id}`
+  - `get_session_report(session_id)` → most recent report doc or None
+- [x] Test: feed sample findings → get well-structured report content ✅ Syntax-validated; E2E test via `POST /inspection/{session_id}/report` after a live session
 
 #### Task 2.2: PDF Report Generation (10 hrs)
 - [ ] Implement PDF generation using ReportLab or WeasyHTML

@@ -13,7 +13,7 @@ import json
 import logging
 import traceback
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from google.adk.agents import LiveRequestQueue
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -22,7 +22,9 @@ from google.genai import types
 from google.genai import errors as genai_errors
 
 from app.livelens_agent.agent import root_agent
+from app.livelens_agent.report_agent import generate_inspection_report
 from app.livelens_agent.tools import clear_frame_buffer, update_frame_buffer
+from app.services import firestore as firestore_svc
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -266,3 +268,84 @@ async def websocket_endpoint(
             await websocket.close()
         except Exception:
             pass
+
+
+# ── Task 2.1: Report Generator REST endpoints ─────────────────────────────────
+
+
+@router.post("/inspection/{session_id}/report")
+async def trigger_report_generation(session_id: str):
+    """Generate an inspection report for a completed session (Task 2.1).
+
+    Fetches all findings logged during the session from Firestore, calls
+    Gemini 2.5 Flash (non-live) to synthesise a structured JSON report, and
+    persists it.  Returns the full structured report as JSON.
+
+    Args:
+        session_id: Inspection session identifier matching the WebSocket session.
+
+    Returns:
+        Structured JSON report with executive_summary, findings (sorted by
+        severity), summary_statistics, recommendations, and disclaimer.
+    """
+    logger.info(f"Report generation requested: session={session_id}")
+    try:
+        report = await generate_inspection_report(session_id)
+        return report
+    except Exception as exc:
+        logger.error(
+            f"Report generation failed: session={session_id}, error={exc}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Report generation failed: {exc}",
+        )
+
+
+@router.get("/inspection/{session_id}/report")
+async def get_report(session_id: str):
+    """Fetch the most recently generated inspection report for a session.
+
+    Args:
+        session_id: Inspection session identifier.
+
+    Returns:
+        The latest report dict from Firestore.
+
+    Raises:
+        404: If no report has been generated yet for this session.
+    """
+    logger.info(f"Report fetch requested: session={session_id}")
+    report = await firestore_svc.get_session_report(session_id)
+    if report is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No report found for this session. "
+                "POST to /inspection/{session_id}/report to generate one."
+            ),
+        )
+    return report
+
+
+@router.get("/inspection/{session_id}/findings")
+async def get_findings(session_id: str):
+    """Fetch all logged findings for an inspection session.
+
+    Useful for debugging, testing report generation, and the frontend
+    dashboard (Task 2.4 / Task 3.2).
+
+    Args:
+        session_id: Inspection session identifier.
+
+    Returns:
+        Dict with session_id, count, and list of finding dicts.
+    """
+    logger.info(f"Findings fetch requested: session={session_id}")
+    findings = await firestore_svc.get_session_findings(session_id)
+    return {
+        "session_id": session_id,
+        "count": len(findings),
+        "findings": findings,
+    }

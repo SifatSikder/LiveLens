@@ -111,3 +111,69 @@ async def get_session_findings(session_id: str) -> list[dict[str, Any]]:
     logger.info(f"Retrieved {len(findings)} findings for session={session_id}")
     return findings
 
+
+async def save_report(session_id: str, report_data: dict[str, Any]) -> str:
+    """Persist a generated inspection report to Firestore.
+
+    Stored at: inspections/{session_id}/reports/{report_id}
+
+    Args:
+        session_id: The inspection session identifier.
+        report_data: The full structured report dict produced by the
+            Report Generator Agent.
+
+    Returns:
+        The generated report document ID (e.g. "R-abc12345").
+    """
+    db = _get_db()
+    settings = get_settings()
+
+    report_id = f"R-{uuid.uuid4().hex[:8]}"
+    doc = {
+        "report_id": report_id,
+        "session_id": session_id,
+        **report_data,
+    }
+
+    ref = (
+        db.collection(settings.firestore_collection)
+        .document(session_id)
+        .collection("reports")
+        .document(report_id)
+    )
+    await ref.set(doc)
+    logger.info(f"Report saved: session={session_id}, report={report_id}")
+    return report_id
+
+
+async def get_session_report(session_id: str) -> dict[str, Any] | None:
+    """Retrieve the most recently generated report for a session.
+
+    Args:
+        session_id: The inspection session identifier.
+
+    Returns:
+        The most recent report dict, or None if no reports exist.
+    """
+    db = _get_db()
+    settings = get_settings()
+
+    col_ref = (
+        db.collection(settings.firestore_collection)
+        .document(session_id)
+        .collection("reports")
+    )
+
+    reports: list[dict[str, Any]] = []
+    async for doc in col_ref.stream():
+        reports.append(doc.to_dict())
+
+    if not reports:
+        logger.info(f"No reports found for session={session_id}")
+        return None
+
+    # Sort in Python — sessions have at most a handful of reports
+    reports.sort(key=lambda r: r.get("generated_at", ""), reverse=True)
+    logger.info(f"Retrieved latest report for session={session_id}")
+    return reports[0]
+
