@@ -12,6 +12,9 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 const WS_BASE = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
 
 export function useInspection() {
+  // Declare ref first so state initialiser can safely reference it
+  const sessionIdRef = useRef('session-' + Math.random().toString(36).substring(2, 9));
+
   const [connected, setConnected] = useState(false);
   const [inspecting, setInspecting] = useState(false);
   const [events, setEvents] = useState([]);
@@ -32,7 +35,6 @@ export function useInspection() {
   const playContextRef = useRef(null);
   const videoRef = useRef(null);
   const frameIntervalRef = useRef(null);
-  const sessionIdRef = useRef('session-' + Math.random().toString(36).substring(2, 9));
   const activeSourcesRef = useRef([]);
   const agentSpeakingTimerRef = useRef(null);
 
