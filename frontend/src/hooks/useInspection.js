@@ -17,7 +17,7 @@ export function useInspection() {
   const [events, setEvents] = useState([]);
   const [findings, setFindings] = useState([]);
   const [transcript, setTranscript] = useState([]);
-  const [sessionError, setSessionError] = useState(null); // { code, message }
+  const [sessionError, setSessionError] = useState(null);
 
   const wsRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -28,7 +28,7 @@ export function useInspection() {
   const frameIntervalRef = useRef(null);
   const sessionIdRef = useRef('session-' + Math.random().toString(36).substring(2, 9));
 
-  // ── Connect WebSocket ─────────────────────────────────────────────
+  // Connect WebSocket
   const connect = useCallback(() => {
     const userId = 'inspector-1';
     const sessionId = sessionIdRef.current;
@@ -76,7 +76,7 @@ export function useInspection() {
     wsRef.current = ws;
   }, []);
 
-  // ── Disconnect ────────────────────────────────────────────────────
+  // Disconnect
   const disconnect = useCallback(() => {
     stopCamera();
     stopAudio();
@@ -88,7 +88,7 @@ export function useInspection() {
     setInspecting(false);
   }, []);
 
-  // ── Reconnect (clear error, fresh session ID, reconnect) ──────────
+  // Reconnect (clear error, fresh session ID, reconnect)
   const reconnect = useCallback(() => {
     setSessionError(null);
     // Generate a new session ID so backend creates a fresh ADK session
@@ -96,14 +96,14 @@ export function useInspection() {
     disconnect();
   }, [disconnect]);
 
-  // ── Send text message ─────────────────────────────────────────────
+  // Send text message
   const sendText = useCallback((text) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'text', content: text }));
     }
   }, []);
 
-  // ── Audio Capture (16-bit PCM, 16kHz) ─────────────────────────────
+  // Audio Capture (16-bit PCM, 16kHz)
   const startAudio = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -170,7 +170,7 @@ export function useInspection() {
 
   const playNextAtRef = useRef(0);
 
-  // ── Audio Playback (24kHz PCM from agent) ─────────────────────────
+  // Audio Playback (24kHz PCM from agent)
   const playAudioChunk = useCallback((base64Data, mimeType) => {
     try {
       if (!playContextRef.current) {
@@ -212,7 +212,7 @@ export function useInspection() {
     }
   }, []);
 
-  // ── Camera Capture (1 FPS JPEG frames) ────────────────────────────
+  // Camera Capture (1 FPS JPEG frames)
   const startCamera = useCallback(async (videoElement) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -259,7 +259,7 @@ export function useInspection() {
     console.log('[Camera] Stopped');
   }, []);
 
-  // ── Event Handler ─────────────────────────────────────────────────
+  // Event Handler
   const handleEvent = useCallback((event) => {
     // Add to raw events log
     setEvents(prev => [...prev.slice(-100), event]);
@@ -336,7 +336,7 @@ export function useInspection() {
     }
   }, [playAudioChunk]);
 
-  // ── Start/Stop Inspection ─────────────────────────────────────────
+  // Start/Stop Inspection
   const startInspection = useCallback(async (videoElement) => {
     if (!connected) connect();
 
@@ -363,7 +363,7 @@ export function useInspection() {
     setInspecting(false);
   }, [stopCamera, stopAudio]);
 
-  // ── Cleanup on unmount ────────────────────────────────────────────
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       disconnect();

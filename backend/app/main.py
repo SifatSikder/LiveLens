@@ -69,7 +69,7 @@ async def root():
     }
 
 
-# ── Register WebSocket router ─────────────────────────────────────────────
+# Register WebSocket router
 from app.routers.inspection import router as inspection_router
 
 app.include_router(inspection_router)

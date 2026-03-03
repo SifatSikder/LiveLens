@@ -12,7 +12,6 @@ import base64
 import json
 import logging
 import traceback
-import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from google.adk.agents import LiveRequestQueue
@@ -29,8 +28,6 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-# ── Phase 1: Application Initialization (singletons) ──────────────────────
 
 APP_NAME = "livelens"
 
@@ -66,7 +63,7 @@ def _build_run_config() -> RunConfig:
             speech_config=types.SpeechConfig(
                 voice_config=types.VoiceConfig(
                     prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                        voice_name="Orus"  # Authoritative, professional voice
+                        voice_name="Orus"
                     )
                 )
             ),
@@ -74,11 +71,10 @@ def _build_run_config() -> RunConfig:
             input_audio_transcription=types.AudioTranscriptionConfig(),
             # Session resumption — handles 10-min WebSocket connection limits
             session_resumption=types.SessionResumptionConfig(
-                handle=None,  # Will be populated by the API on first connection
+                handle=None,
             ),
             # Context window compression — CRITICAL for audio+video sessions.
             # Without this, video+audio sessions are capped at ~2 minutes.
-            # SlidingWindow discards oldest context to keep the window manageable.
             context_window_compression=types.ContextWindowCompressionConfig(
                 sliding_window=types.SlidingWindow(),  # Uses API defaults for target_tokens
             ),
@@ -128,8 +124,6 @@ async def websocket_endpoint(
     await websocket.accept()
     logger.info(f"WebSocket connected: user={user_id}, session={session_id}")
 
-    # ── Phase 2: Session Initialization ────────────────────────────────
-
     # Get or create ADK session
     session = await session_service.get_session(
         app_name=APP_NAME,
@@ -151,8 +145,6 @@ async def websocket_endpoint(
 
     # Create the message queue for this connection
     live_request_queue = LiveRequestQueue()
-
-    # ── Phase 3: Bidi-streaming ────────────────────────────────────────
 
     async def upstream_task():
         """Receive messages from WebSocket client → send to LiveRequestQueue."""
@@ -256,7 +248,7 @@ async def websocket_endpoint(
         except Exception as e:
             logger.error(f"Downstream error: {e}\n{traceback.format_exc()}")
 
-    # ── Run both tasks concurrently ────────────────────────────────────
+    # Run both tasks concurrently
     try:
         await asyncio.gather(
             upstream_task(),
@@ -266,7 +258,6 @@ async def websocket_endpoint(
     except Exception as e:
         logger.error(f"Session error: {e}\n{traceback.format_exc()}")
     finally:
-        # ── Phase 4: Cleanup ───────────────────────────────────────────
         live_request_queue.close()
         clear_frame_buffer(session_id)
         logger.info(f"Session ended: {user_id}/{session_id}")
@@ -274,4 +265,4 @@ async def websocket_endpoint(
         try:
             await websocket.close()
         except Exception:
-            pass  # Already closed
+            pass

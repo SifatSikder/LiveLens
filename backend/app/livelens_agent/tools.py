@@ -23,7 +23,7 @@ from app.services import storage as storage_svc
 
 logger = logging.getLogger(__name__)
 
-# ── Per-session frame buffer ──────────────────────────────────────────────────
+# ── Per-session frame buffer
 # {session_id: {"bytes": <bytes>, "ts": <float epoch>}}
 _frame_buffer: dict[str, dict[str, Any]] = {}
 
@@ -46,7 +46,7 @@ def clear_frame_buffer(session_id: str) -> None:
     _frame_buffer.pop(session_id, None)
 
 
-# ── Tool: search_web ─────────────────────────────────────────────────────────
+# Tool: search_web
 
 async def search_web(query: str) -> dict[str, Any]:
     """Search the web for current information and return results with real URLs.
@@ -86,7 +86,7 @@ async def search_web(query: str) -> dict[str, Any]:
         return {"status": "error", "message": str(exc), "results": []}
 
 
-# ── Tool: log_finding ─────────────────────────────────────────────────────────
+# Tool: log_finding
 
 async def log_finding(
     finding_type: str,
@@ -150,7 +150,7 @@ async def log_finding(
         }
 
 
-# ── Tool: capture_frame ───────────────────────────────────────────────────────
+# Tool: capture_frame
 
 async def capture_frame(
     reason: str,
