@@ -178,6 +178,118 @@ async def get_session_report(session_id: str) -> dict[str, Any] | None:
     return reports[0]
 
 
+async def save_session(session_id: str, session_meta: dict[str, Any]) -> None:
+    """Create or overwrite the top-level session metadata document.
+
+    Stored at: inspections/{session_id}
+
+    Called when a WebSocket inspection session starts so the session appears
+    in the inspection history list even before any findings are logged.
+
+    Args:
+        session_id:   Inspection session identifier (also the document ID).
+        session_meta: Dict containing at minimum ``started_at`` (ISO-8601 UTC).
+                      May include ``user_id``, ``location``, etc.
+    """
+    db = _get_db()
+    settings = get_settings()
+
+    doc = {
+        "session_id": session_id,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "status": "active",
+        "finding_count": 0,
+        "report_url": None,
+        **session_meta,
+    }
+    ref = db.collection(settings.firestore_collection).document(session_id)
+    await ref.set(doc, merge=True)
+    logger.info(f"Session saved: session={session_id}")
+
+
+async def update_session_stats(
+    session_id: str,
+    finding_count: int,
+    report_id: str | None = None,
+    pdf_url: str | None = None,
+) -> None:
+    """Update session-level stats after a report is generated.
+
+    Patches finding_count, status, report_id, report_url, and completed_at
+    on the top-level session document so the history list stays current.
+
+    Args:
+        session_id:    Inspection session identifier.
+        finding_count: Total number of findings logged for the session.
+        report_id:     Report document ID (optional).
+        pdf_url:       PDF download URL (optional).
+    """
+    db = _get_db()
+    settings = get_settings()
+
+    update: dict[str, Any] = {
+        "finding_count": finding_count,
+        "status": "completed",
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if report_id:
+        update["report_id"] = report_id
+    if pdf_url:
+        update["report_url"] = pdf_url
+
+    ref = db.collection(settings.firestore_collection).document(session_id)
+    await ref.update(update)
+    logger.info(
+        f"Session stats updated: session={session_id}, findings={finding_count}, "
+        f"report={report_id}, pdf={'yes' if pdf_url else 'no'}"
+    )
+
+
+async def get_all_sessions(limit: int = 50) -> list[dict[str, Any]]:
+    """Retrieve all inspection sessions ordered by start time (newest first).
+
+    Args:
+        limit: Maximum number of sessions to return (default 50).
+
+    Returns:
+        List of session metadata dicts, newest first.
+    """
+    db = _get_db()
+    settings = get_settings()
+
+    col_ref = (
+        db.collection(settings.firestore_collection)
+        .order_by("started_at", direction="DESCENDING")
+        .limit(limit)
+    )
+
+    sessions: list[dict[str, Any]] = []
+    async for doc in col_ref.stream():
+        sessions.append(doc.to_dict())
+
+    logger.info(f"Retrieved {len(sessions)} inspection sessions")
+    return sessions
+
+
+async def get_session(session_id: str) -> dict[str, Any] | None:
+    """Fetch the top-level session metadata document.
+
+    Args:
+        session_id: Inspection session identifier (document ID).
+
+    Returns:
+        Session metadata dict, or None if the document does not exist.
+    """
+    db = _get_db()
+    settings = get_settings()
+
+    ref = db.collection(settings.firestore_collection).document(session_id)
+    snap = await ref.get()
+    if not snap.exists:
+        return None
+    return snap.to_dict()
+
+
 async def update_report_pdf_url(session_id: str, report_id: str, pdf_url: str) -> None:
     """Patch the pdf_url field on an existing report document.
 

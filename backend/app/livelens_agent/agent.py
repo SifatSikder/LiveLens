@@ -11,7 +11,7 @@ from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
 
 from app.livelens_agent.prompts import INSPECTOR_SYSTEM_INSTRUCTION
-from app.livelens_agent.tools import capture_frame, log_finding, search_web
+from app.livelens_agent.tools import capture_frame, generate_report, log_finding, search_web
 
 # Load .env so GOOGLE_GENAI_USE_VERTEXAI and other vars are set before ADK init
 load_dotenv()
@@ -31,5 +31,6 @@ root_agent = Agent(
         FunctionTool(search_web),       # Task 1.4: real web search with actual URLs
         FunctionTool(log_finding),      # Task 1.2: persist defect findings to Firestore
         FunctionTool(capture_frame),    # Task 1.3: save video frame to Cloud Storage
+        FunctionTool(generate_report),  # Task 2.3: trigger report generation from live session
     ],
 )

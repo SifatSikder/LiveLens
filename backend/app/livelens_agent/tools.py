@@ -21,6 +21,10 @@ from google.adk.tools import ToolContext
 from app.services import firestore as firestore_svc
 from app.services import storage as storage_svc
 
+# Import lazily inside the tool to avoid a circular import at module load time
+# (report_agent imports tools indirectly via agent → tools → report_agent).
+# The actual import is deferred to the first generate_report call.
+
 logger = logging.getLogger(__name__)
 
 # ── Per-session frame buffer
@@ -214,3 +218,101 @@ async def capture_frame(
             "status": "error",
             "message": f"Failed to capture frame: {exc}",
         }
+
+
+# Tool: generate_report (Task 2.3)
+
+async def generate_report(tool_context: ToolContext) -> dict[str, Any]:
+    """Generate a full inspection report for the current session.
+
+    Call this tool when the user asks to generate, create, or produce an
+    inspection report (e.g. "Generate the report", "Create my report",
+    "I'm done — make the report").
+
+    This tool:
+    1. Counts all findings logged so far for the session.
+    2. Calls the Report Generator Agent (Gemini 2.5 Flash) to synthesise a
+       structured JSON report from those findings.
+    3. Generates a professional PDF and uploads it to Cloud Storage.
+    4. Returns the report summary and a PDF download link for the frontend.
+
+    Before calling, you should confirm verbally with the user:
+    "I've logged N findings for this session. Generating your inspection
+    report now — this will take a few seconds."
+
+    Args:
+        tool_context: ADK tool context — provides session and state access.
+
+    Returns:
+        Dict with status, finding_count, report_id, pdf_url (if available),
+        executive_summary snippet, and a human-readable message for the agent
+        to read aloud to the user.
+    """
+    # Deferred import to avoid circular dependency at module load time.
+    # agent.py → tools.py → report_agent.py → tools (indirectly via firestore_svc)
+    from app.livelens_agent.report_agent import generate_inspection_report  # noqa: PLC0415
+
+    session_id = tool_context.session.id
+    logger.info(f"generate_report tool invoked: session={session_id}")
+
+    # ── 1. Count current findings for the user-facing confirmation message ────
+    try:
+        findings = await firestore_svc.get_session_findings(session_id)
+        finding_count = len(findings)
+    except Exception as exc:
+        logger.error(f"generate_report: failed to count findings: {exc}", exc_info=True)
+        finding_count = 0
+
+    if finding_count == 0:
+        return {
+            "status": "empty",
+            "finding_count": 0,
+            "message": (
+                "No findings have been logged for this session yet. "
+                "Please inspect the structure and log at least one finding before generating a report."
+            ),
+        }
+
+    # ── 2. Generate JSON report + PDF ─────────────────────────────────────────
+    try:
+        report = await generate_inspection_report(session_id)
+    except Exception as exc:
+        logger.error(f"generate_report: report generation failed: {exc}", exc_info=True)
+        return {
+            "status": "error",
+            "finding_count": finding_count,
+            "message": f"Report generation failed: {exc}",
+        }
+
+    # ── 3. Build a concise result for the agent to relay to the user ──────────
+    pdf_url = report.get("pdf_url")
+    report_id = report.get("report_id", "")
+    summary = report.get("executive_summary", "")
+    # Trim summary to ~200 chars so the agent can read a brief snippet aloud
+    summary_snippet = (summary[:200] + "…") if len(summary) > 200 else summary
+
+    if pdf_url:
+        message = (
+            f"Your inspection report is ready. I logged {finding_count} finding(s) "
+            f"during this session. {summary_snippet} "
+            f"The PDF report is available for download."
+        )
+    else:
+        message = (
+            f"Your inspection report has been generated with {finding_count} finding(s). "
+            f"{summary_snippet} "
+            f"Note: PDF download is not available — Cloud Storage may not be configured."
+        )
+
+    logger.info(
+        f"generate_report: complete — session={session_id}, findings={finding_count}, "
+        f"report_id={report_id}, pdf={'yes' if pdf_url else 'no'}"
+    )
+    return {
+        "status": report.get("status", "ok"),
+        "finding_count": finding_count,
+        "report_id": report_id,
+        "pdf_url": pdf_url,
+        "executive_summary_snippet": summary_snippet,
+        "message": message,
+    }

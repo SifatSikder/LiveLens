@@ -193,5 +193,19 @@ async def generate_inspection_report(session_id: str) -> dict[str, Any]:
         report_data["pdf_url"] = None
         report_data["pdf_error"] = str(pdf_exc)
 
+    # ── 8. Update top-level session document with stats (Task 2.4) ────────────
+    try:
+        await firestore_svc.update_session_stats(
+            session_id=session_id,
+            finding_count=len(findings),
+            report_id=report_id,
+            pdf_url=report_data.get("pdf_url"),
+        )
+    except Exception as stats_exc:
+        # Non-fatal: session stats update should not block report delivery
+        logger.warning(
+            "Failed to update session stats for session=%s: %s", session_id, stats_exc
+        )
+
     return report_data
 

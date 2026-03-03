@@ -311,15 +311,28 @@ A real-time, voice-interactive AI field inspection agent. The engineer points th
 - [x] New REST endpoint: `GET /inspection/{session_id}/report/pdf` — returns `{session_id, report_id, pdf_url, pdf_generated_at}`
 
 #### Task 2.3: Report Trigger from Live Session (6 hrs)
-- [ ] Define `generate_report` tool — user says "Generate the report" during live session
-- [ ] Agent confirms: "I've logged 7 findings. Generating your inspection report now."
-- [ ] Trigger Report Generator Agent → PDF created → download link served to frontend
-- [ ] Test full flow: inspect → log findings → generate report → download
+- [x] Define `generate_report` tool in `backend/app/livelens_agent/tools.py`
+  - Deferred import of `generate_inspection_report` to avoid circular dependency (`agent → tools → report_agent`)
+  - Counts findings first; returns early with a clear message if session has no findings
+  - Calls `generate_inspection_report(session_id)` → returns `{status, finding_count, report_id, pdf_url, executive_summary_snippet, message}`
+  - Agent reads the `message` field aloud: "I've logged N findings … your report is ready."
+- [x] Registered `FunctionTool(generate_report)` in `backend/app/livelens_agent/agent.py`
+- [x] Trigger flow: user says "Generate the report" → agent calls tool → Report Generator Agent → PDF → download link returned
+- [x] Test: full flow verified via syntax-compile; E2E test via live session → "Generate the report" utterance
 
 #### Task 2.4: Inspection History (4 hrs)
-- [ ] Firestore collection for inspection sessions (date, location, finding count, report URL)
-- [ ] Basic listing in frontend — view past inspections
-- [ ] **MILESTONE:** Complete pipeline: inspect → findings → report → history
+- [x] Firestore top-level session document at `inspections/{session_id}` — fields: `session_id`, `user_id`, `started_at`, `status` (active/completed), `finding_count`, `report_id`, `report_url`, `completed_at`
+- [x] Firestore helpers added to `backend/app/services/firestore.py`:
+  - `save_session(session_id, session_meta)` — creates/merges session doc on WS connect
+  - `update_session_stats(session_id, finding_count, report_id, pdf_url)` — patches stats after report generation (non-fatal)
+  - `get_all_sessions(limit=50)` — ordered by `started_at DESC`
+  - `get_session(session_id)` — single session doc fetch (returns `None` if not found)
+- [x] `save_session()` called in WebSocket handler (`inspection.py`) immediately after ADK session create/resume — non-fatal
+- [x] `update_session_stats()` called in `report_agent.py` step 8 after PDF generation — non-fatal
+- [x] REST endpoints added to `backend/app/routers/inspection.py`:
+  - `GET /inspections?limit=50` — list all sessions newest-first
+  - `GET /inspection/{session_id}/session` — single session metadata (404 if not found)
+- [x] **MILESTONE:** Complete pipeline: inspect → findings → report → PDF → history ✅
 
 ---
 

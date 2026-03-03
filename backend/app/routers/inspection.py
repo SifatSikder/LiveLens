@@ -142,6 +142,12 @@ async def websocket_endpoint(
     else:
         logger.info(f"Resumed existing session: {session_id}")
 
+    # Persist session metadata to Firestore for inspection history (Task 2.4)
+    try:
+        await firestore_svc.save_session(session_id, {"user_id": user_id})
+    except Exception as e:
+        logger.warning(f"Failed to save session metadata: {e}")
+
     # Build RunConfig for native-audio streaming
     run_config = _build_run_config()
 
@@ -394,3 +400,46 @@ async def get_report_pdf_url(session_id: str):
         "pdf_url": pdf_url,
         "pdf_generated_at": report.get("pdf_generated_at"),
     }
+
+
+@router.get("/inspections")
+async def list_inspections(limit: int = 50):
+    """List all inspection sessions ordered by start time, newest first (Task 2.4).
+
+    Returns a summary of every session that has been started via the WebSocket
+    endpoint.  Sessions are persisted the moment a WebSocket connection is
+    established, so this list reflects both active and completed sessions.
+
+    Args:
+        limit: Maximum number of sessions to return (default 50, max enforced
+               by Firestore query).
+
+    Returns:
+        Dict with count and list of session metadata dicts.
+    """
+    logger.info(f"Listing inspections (limit={limit})")
+    sessions = await firestore_svc.get_all_sessions(limit=limit)
+    return {"count": len(sessions), "sessions": sessions}
+
+
+@router.get("/inspection/{session_id}/session")
+async def get_session_metadata(session_id: str):
+    """Return metadata for a single inspection session (Task 2.4).
+
+    Args:
+        session_id: Inspection session identifier.
+
+    Returns:
+        Session metadata dict (started_at, status, finding_count, report_url, …).
+
+    Raises:
+        404: If the session does not exist in Firestore.
+    """
+    logger.info(f"Session metadata fetch: session={session_id}")
+    session = await firestore_svc.get_session(session_id)
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Session '{session_id}' not found.",
+        )
+    return session
