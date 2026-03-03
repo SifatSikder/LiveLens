@@ -15,6 +15,7 @@ Data flow:
   6. Return the full report dict to the caller
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -27,6 +28,8 @@ from google.genai import types
 from app.config import get_settings
 from app.livelens_agent.prompts import REPORT_GENERATOR_INSTRUCTION
 from app.services import firestore as firestore_svc
+from app.services import storage as storage_svc
+from app.services.pdf_gen import generate_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +169,29 @@ async def generate_inspection_report(session_id: str) -> dict[str, Any]:
         report_id,
         len(findings),
     )
+
+    # ── 7. Generate PDF and upload to Cloud Storage ───────────────────────────
+    pdf_url: str | None = None
+    try:
+        settings = get_settings()
+        if settings.gcs_bucket_name:
+            pdf_bytes = await asyncio.to_thread(generate_pdf, report_data, session_id)
+            pdf_url = await storage_svc.upload_pdf(session_id, report_id, pdf_bytes)
+            await firestore_svc.update_report_pdf_url(session_id, report_id, pdf_url)
+            report_data["pdf_url"] = pdf_url
+            logger.info("PDF uploaded: session=%s, report=%s, url=%s", session_id, report_id, pdf_url)
+        else:
+            logger.warning(
+                "GCS_BUCKET_NAME not configured — skipping PDF upload for session=%s", session_id
+            )
+            report_data["pdf_url"] = None
+    except Exception as pdf_exc:
+        # PDF generation is non-fatal: return the JSON report even if PDF fails
+        logger.error(
+            "PDF generation/upload failed for session=%s: %s", session_id, pdf_exc, exc_info=True
+        )
+        report_data["pdf_url"] = None
+        report_data["pdf_error"] = str(pdf_exc)
 
     return report_data
 

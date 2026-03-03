@@ -349,3 +349,48 @@ async def get_findings(session_id: str):
         "count": len(findings),
         "findings": findings,
     }
+
+
+@router.get("/inspection/{session_id}/report/pdf")
+async def get_report_pdf_url(session_id: str):
+    """Return the PDF download URL for the most recent inspection report (Task 2.2).
+
+    The pdf_url is stored on the report document in Firestore after the PDF
+    is generated and uploaded to Cloud Storage by the Report Generator Agent.
+
+    Args:
+        session_id: Inspection session identifier.
+
+    Returns:
+        Dict with session_id, report_id, and pdf_url (HTTPS signed URL).
+
+    Raises:
+        404: If no report has been generated yet.
+        409: If a report exists but PDF generation has not completed yet.
+    """
+    logger.info(f"PDF URL fetch requested: session={session_id}")
+    report = await firestore_svc.get_session_report(session_id)
+    if report is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No report found for this session. "
+                "POST to /inspection/{session_id}/report to generate one."
+            ),
+        )
+    pdf_url = report.get("pdf_url")
+    if not pdf_url:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Report exists but PDF is not yet available. "
+                "This may indicate GCS is not configured or PDF generation failed. "
+                f"pdf_error: {report.get('pdf_error', 'unknown')}"
+            ),
+        )
+    return {
+        "session_id": session_id,
+        "report_id": report.get("report_id"),
+        "pdf_url": pdf_url,
+        "pdf_generated_at": report.get("pdf_generated_at"),
+    }

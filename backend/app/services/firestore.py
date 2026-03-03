@@ -177,3 +177,27 @@ async def get_session_report(session_id: str) -> dict[str, Any] | None:
     logger.info(f"Retrieved latest report for session={session_id}")
     return reports[0]
 
+
+async def update_report_pdf_url(session_id: str, report_id: str, pdf_url: str) -> None:
+    """Patch the pdf_url field on an existing report document.
+
+    Called after PDF generation so the report document links to the
+    downloadable PDF stored in Cloud Storage.
+
+    Args:
+        session_id: The inspection session identifier.
+        report_id:  The report document ID (e.g. "R-abc12345").
+        pdf_url:    HTTPS URL (signed or public) of the uploaded PDF.
+    """
+    db = _get_db()
+    settings = get_settings()
+
+    ref = (
+        db.collection(settings.firestore_collection)
+        .document(session_id)
+        .collection("reports")
+        .document(report_id)
+    )
+    await ref.update({"pdf_url": pdf_url, "pdf_generated_at": datetime.now(timezone.utc).isoformat()})
+    logger.info(f"Report PDF URL saved: report={report_id}, url={pdf_url[:80]}")
+

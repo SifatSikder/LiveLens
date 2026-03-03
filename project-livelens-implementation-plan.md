@@ -295,11 +295,20 @@ A real-time, voice-interactive AI field inspection agent. The engineer points th
 - [x] Test: feed sample findings → get well-structured report content ✅ Syntax-validated; E2E test via `POST /inspection/{session_id}/report` after a live session
 
 #### Task 2.2: PDF Report Generation (10 hrs)
-- [ ] Implement PDF generation using ReportLab or WeasyHTML
-- [ ] Template: Professional header (LiveLens branding), table of contents
-- [ ] Findings section: each finding with severity badge, captured image, description, recommendation
-- [ ] Summary statistics: total findings, severity distribution, priority actions
-- [ ] Store generated PDF in Cloud Storage, generate signed URL
+- [x] Implement PDF generation using ReportLab — `backend/app/services/pdf_gen.py`
+  - `generate_pdf(report_data, session_id) → bytes` callable via `asyncio.to_thread`
+- [x] Template: Professional header (LiveLens branding, session metadata), table of contents
+  - Branded blue cover banner, metadata table (session ID, date, location, inspector, conditions, finding count)
+  - Static table of contents with 4 numbered sections
+- [x] Findings section: each finding with severity colour badge (1=green→5=dark-red), location, description, recommendation, standard_reference, embedded captured image (fetched from HTTPS signed URL)
+- [x] Summary statistics: total findings, severity breakdown table (5-row), findings-by-type table
+- [x] Recommendations: priority-ordered numbered list + disclaimer section
+- [x] Store generated PDF in Cloud Storage, generate signed URL — `upload_pdf()` in `backend/app/services/storage.py`
+  - v4 signed URL (60-min TTL); graceful fallback to `blob.make_public()` on Workload Identity envs; final fallback to `gs://` URI
+  - Blob path: `{gcs_reports_prefix}/{session_id}/{report_id}_{timestamp}.pdf`
+- [x] Firestore helper: `update_report_pdf_url(session_id, report_id, pdf_url)` added to `backend/app/services/firestore.py`
+- [x] `generate_inspection_report()` in `report_agent.py` now calls PDF generation after JSON report is persisted; `pdf_url` returned in response; PDF failure is non-fatal (JSON report still returned with `pdf_error` field)
+- [x] New REST endpoint: `GET /inspection/{session_id}/report/pdf` — returns `{session_id, report_id, pdf_url, pdf_generated_at}`
 
 #### Task 2.3: Report Trigger from Live Session (6 hrs)
 - [ ] Define `generate_report` tool — user says "Generate the report" during live session
