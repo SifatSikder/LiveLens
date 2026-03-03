@@ -17,6 +17,7 @@ export function useInspection() {
   const [events, setEvents] = useState([]);
   const [findings, setFindings] = useState([]);
   const [transcript, setTranscript] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
   const [sessionError, setSessionError] = useState(null);
 
   const wsRef = useRef(null);
@@ -330,6 +331,23 @@ export function useInspection() {
           }]);
         }
       }
+
+      if (part.function_response) {
+        const fr = part.function_response;
+        console.log('[Tool] Function response:', fr.name);
+        if (fr.name === 'search_web') {
+          const results = fr.response?.results || [];
+          const valid = results.filter(r => r.url && r.title);
+          if (valid.length > 0) {
+            console.log(`[Search] Surfacing ${valid.length} result(s) to UI`);
+            setSearchResults(prev => {
+              const existingUrls = new Set(prev.map(r => r.url));
+              const newOnes = valid.filter(r => !existingUrls.has(r.url));
+              return newOnes.length > 0 ? [...prev, ...newOnes] : prev;
+            });
+          }
+        }
+      }
     }
 
     // ✅ FIX 2: Transcription — only read from partial:false events.
@@ -403,6 +421,7 @@ export function useInspection() {
     events,
     findings,
     transcript,
+    searchResults,
     sessionError,
 
     // Actions

@@ -3,6 +3,34 @@ import { Camera, Activity, FileText, Wifi, WifiOff, Mic, MicOff, Send, Video, Vi
 import { useInspection } from './hooks/useInspection'
 
 /**
+ * Parses text and renders URLs as styled, clickable anchor tags.
+ */
+function MessageText({ text }) {
+  const urlRegex = /(https?:\/\/[^\s]+)/g
+  const parts = text.split(urlRegex)
+  return (
+    <>
+      {parts.map((part, i) =>
+        urlRegex.test(part) ? (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 underline underline-offset-2 hover:text-blue-300 break-all transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  )
+}
+
+/**
  * LiveLens App — Task 0.2: Working bidi-streaming with audio + video.
  */
 export default function App() {
@@ -12,6 +40,7 @@ export default function App() {
     events,
     findings,
     transcript,
+    searchResults,
     sessionError,
     connect,
     disconnect,
@@ -193,13 +222,13 @@ export default function App() {
                     className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
+                      className={`max-w-[85%] px-3 py-2 rounded-lg text-sm break-all overflow-hidden ${
                         msg.role === 'user'
                           ? 'bg-blue-600/30 text-blue-100'
                           : 'bg-gray-800 text-gray-200'
                       } ${msg.isTranscription ? 'italic opacity-80' : ''}`}
                     >
-                      {msg.text}
+                      <MessageText text={msg.text} />
                     </div>
                   </div>
                 ))}
@@ -207,6 +236,36 @@ export default function App() {
               </div>
             )}
           </div>
+
+          {/* Search Results / Reference Links */}
+          {searchResults.length > 0 && (
+            <div className="border-t border-gray-800 p-4 max-h-56 overflow-y-auto">
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                References ({searchResults.length})
+              </h2>
+              <div className="space-y-2">
+                {searchResults.map((r, i) => (
+                  <a
+                    key={i}
+                    href={r.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block p-2.5 rounded-lg border border-blue-500/20 bg-blue-500/10 hover:bg-blue-500/20 hover:border-blue-400/40 transition-colors group"
+                  >
+                    <p className="text-xs font-medium text-blue-300 group-hover:text-blue-200 leading-snug mb-1">
+                      {r.title}
+                    </p>
+                    <p className="text-[10px] text-blue-500/70 break-all leading-tight">
+                      {r.url}
+                    </p>
+                    {r.snippet && (
+                      <p className="text-[10px] text-gray-500 mt-1 line-clamp-2">{r.snippet}</p>
+                    )}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Findings */}
           <div className="border-t border-gray-800 p-4 max-h-64 overflow-y-auto">
