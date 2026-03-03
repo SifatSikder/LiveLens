@@ -27,6 +27,7 @@ export function useInspection() {
   const videoRef = useRef(null);
   const frameIntervalRef = useRef(null);
   const sessionIdRef = useRef('session-' + Math.random().toString(36).substring(2, 9));
+  const activeSourcesRef = useRef([]);
 
   // Connect WebSocket
   const connect = useCallback(() => {
@@ -148,6 +149,12 @@ export function useInspection() {
   }, []);
 
   const stopAudio = useCallback(() => {
+    activeSourcesRef.current.forEach(source => {
+      try { source.stop(); } catch (_) {}
+    });
+    activeSourcesRef.current = [];
+    playNextAtRef.current = 0;
+
     if (processorRef.current) {
       processorRef.current.disconnect();
       processorRef.current = null;
@@ -166,6 +173,15 @@ export function useInspection() {
       playNextAtRef.current = 0;
     }
     console.log('[Audio] Capture stopped');
+  }, []);
+
+  const flushAudioPlayback = useCallback(() => {
+    console.log(`[Interruption] Flushing ${activeSourcesRef.current.length} scheduled audio chunks`);
+    activeSourcesRef.current.forEach(source => {
+      try { source.stop(); } catch (_) {}
+    });
+    activeSourcesRef.current = [];
+    playNextAtRef.current = 0;
   }, []);
 
   const playNextAtRef = useRef(0);
@@ -202,6 +218,10 @@ export function useInspection() {
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       source.connect(ctx.destination);
+      activeSourcesRef.current.push(source);
+      source.onended = () => {
+        activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
+      };
 
       // Schedule chunks back-to-back to avoid gaps/overlap
       const startAt = Math.max(ctx.currentTime, playNextAtRef.current);
@@ -263,6 +283,12 @@ export function useInspection() {
   const handleEvent = useCallback((event) => {
     // Add to raw events log
     setEvents(prev => [...prev.slice(-100), event]);
+
+    if (event?.interrupted === true) {
+      console.log('[Interruption] Agent interrupted by user — flushing audio playback');
+      flushAudioPlayback();
+      return; // Nothing else to process in this event
+    }
 
     const content = event?.content;
     const parts = content?.parts || [];
@@ -334,7 +360,7 @@ export function useInspection() {
         }]);
       }
     }
-  }, [playAudioChunk]);
+  }, [playAudioChunk, flushAudioPlayback]);
 
   // Start/Stop Inspection
   const startInspection = useCallback(async (videoElement) => {
