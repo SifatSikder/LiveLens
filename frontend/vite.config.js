@@ -20,6 +20,15 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      // Inspection REST endpoints (Tasks 2.1-2.4, 3.1-3.2)
+      '/inspection': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/inspections': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
     },
   },
 })

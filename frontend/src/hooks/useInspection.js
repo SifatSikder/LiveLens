@@ -19,6 +19,11 @@ export function useInspection() {
   const [transcript, setTranscript] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
   const [sessionError, setSessionError] = useState(null);
+  // Task 3.1: report generation state exposed to InspectionView
+  const [reportUrl, setReportUrl] = useState(null);
+  const [generating, setGenerating] = useState(false);
+  const [agentSpeaking, setAgentSpeaking] = useState(false);
+  const [sessionId, setSessionId] = useState(sessionIdRef.current);
 
   const wsRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -29,6 +34,7 @@ export function useInspection() {
   const frameIntervalRef = useRef(null);
   const sessionIdRef = useRef('session-' + Math.random().toString(36).substring(2, 9));
   const activeSourcesRef = useRef([]);
+  const agentSpeakingTimerRef = useRef(null);
 
   // Connect WebSocket
   const connect = useCallback(() => {
@@ -93,8 +99,11 @@ export function useInspection() {
   // Reconnect (clear error, fresh session ID, reconnect)
   const reconnect = useCallback(() => {
     setSessionError(null);
+    setReportUrl(null);
+    setGenerating(false);
     // Generate a new session ID so backend creates a fresh ADK session
     sessionIdRef.current = 'session-' + Math.random().toString(36).substring(2, 9);
+    setSessionId(sessionIdRef.current);
     disconnect();
   }, [disconnect]);
 
@@ -228,6 +237,11 @@ export function useInspection() {
       const startAt = Math.max(ctx.currentTime, playNextAtRef.current);
       source.start(startAt);
       playNextAtRef.current = startAt + buffer.duration;
+
+      // Pulse agentSpeaking indicator (debounced 400ms after last chunk)
+      setAgentSpeaking(true);
+      clearTimeout(agentSpeakingTimerRef.current);
+      agentSpeakingTimerRef.current = setTimeout(() => setAgentSpeaking(false), 400);
     } catch (err) {
       console.warn('[Audio] Playback error:', err);
     }
@@ -347,6 +361,15 @@ export function useInspection() {
             });
           }
         }
+        // Task 2.3/3.1: capture pdf_url from generate_report tool response
+        if (fr.name === 'generate_report') {
+          setGenerating(false);
+          const url = fr.response?.pdf_url;
+          if (url) {
+            console.log('[Report] PDF ready:', url);
+            setReportUrl(url);
+          }
+        }
       }
     }
 
@@ -414,6 +437,12 @@ export function useInspection() {
     };
   }, [disconnect]);
 
+  // Task 3.1: Trigger report generation via agent voice/text flow
+  const triggerReport = useCallback(() => {
+    setGenerating(true);
+    sendText('Generate the inspection report');
+  }, [sendText]);
+
   return {
     // State
     connected,
@@ -423,6 +452,11 @@ export function useInspection() {
     transcript,
     searchResults,
     sessionError,
+    // Task 3.1: new state
+    reportUrl,
+    generating,
+    agentSpeaking,
+    sessionId,
 
     // Actions
     connect,
@@ -433,5 +467,6 @@ export function useInspection() {
     stopInspection,
     startCamera,
     stopCamera,
+    triggerReport,
   };
 }

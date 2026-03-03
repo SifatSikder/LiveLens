@@ -339,19 +339,29 @@ A real-time, voice-interactive AI field inspection agent. The engineer points th
 ### Phase 3: Frontend Polish (Days 9-11) — ~30 hours
 **Goal:** Build a polished, demo-ready UI
 
-#### Task 3.1: Inspection View (12 hrs)
-- [ ] Camera feed (main area) with live status indicator
-- [ ] Audio waveform visualization (shows agent is listening/speaking)
-- [ ] Real-time findings sidebar — findings appear as agent logs them
-- [ ] Severity badges with color coding (1=green, 2=yellow, 3=orange, 4=red, 5=critical red)
-- [ ] "Start Inspection" / "End Inspection" / "Generate Report" action buttons
-- [ ] Connection status indicator (connected/reconnecting/disconnected)
+#### Task 3.1: Inspection View (12 hrs) ✅ COMPLETE
+- [x] Camera feed (`CameraStream.jsx`) — `<video>` element with INSPECTING badge overlay + inactive placeholder
+- [x] Audio waveform visualization (`AudioIndicator.jsx`) — 5-bar CSS keyframe animation; green=active mic, blue=agent speaking, grey=idle; driven by `agentSpeaking` / `inspecting` props from hook
+- [x] Real-time findings sidebar (`FindingsSidebar.jsx`) — severity-coloured badges, finding type, description, location_note; re-renders on every new finding
+- [x] Severity badges with colour coding via `.severity-1` → `.severity-5` CSS utility classes (index.css)
+- [x] "Start Inspection" / "End Inspection" / "Generate Report" buttons in `InspectionView.jsx`; Generate Report triggers `triggerReport()` in hook → `sendText('Generate the inspection report')` → ADK → `generate_report` tool
+- [x] Connection status indicator (Wifi/WifiOff) + error banner with "New Session" reconnect button
+- [x] Tab bar in sidebar: Conversation ↔ Findings; search references section
+- [x] Report-ready download banner when `reportUrl` state is set
+- [x] Session ID display (bottom of audio indicator row)
+- [x] `useInspection` hook extended: `reportUrl`, `generating`, `agentSpeaking`, `sessionId` state; `agentSpeakingTimerRef` debounce; `triggerReport` action; `generate_report` function-response event handler
+- [x] `App.jsx` replaced with React Router wrapper (`BrowserRouter` → Route `/` = `InspectionView`, `/dashboard` = `Dashboard`, `*` = redirect to `/`)
+- [x] `frontend/vite.config.js` — added `/inspection` and `/inspections` proxy entries
+- [x] `frontend/src/utils/api.js` — REST utility: `listInspections`, `getSessionMetadata`, `getSessionFindings`, `getSessionReport`, `generateReport`, `getReportPdfUrl`
+- [x] Build validated: `npm run build` — 1,599 modules, 0 errors, 0 warnings
 
-#### Task 3.2: Dashboard View (8 hrs)
-- [ ] Inspection history list
-- [ ] Individual inspection detail view — all findings with images
-- [ ] Report download button
-- [ ] Basic statistics (total inspections, findings by severity)
+#### Task 3.2: Dashboard View (8 hrs) ✅ COMPLETE
+- [x] Inspection history list — `Dashboard.jsx` fetches `GET /inspections` via `listInspections()`; sessions sorted newest-first
+- [x] Individual session detail (`SessionRow`) — expandable; lazy-loads findings via `GET /inspection/{id}/findings` on first expand
+- [x] Report download button — `ReportViewer.jsx` fetches `GET /inspection/{id}/report/pdf`; shows download link or "No report" message
+- [x] Basic statistics row — Total Sessions, Completed, Total Findings cards
+- [x] Status badges — `active` (green), `completed` (blue), `error` (red)
+- [x] Empty state with link to start a new inspection
 
 #### Task 3.3: Mobile Responsiveness (6 hrs)
 - [ ] Camera view works on mobile (this is how it'll actually be used in field)
