@@ -61,7 +61,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-screen flex flex-col overflow-hidden">
       {/* Header */}
       <header className="bg-gray-900 border-b border-gray-800 px-4 py-2.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
